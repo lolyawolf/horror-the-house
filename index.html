@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>THE HOUSE — 3D Horror Demo</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050506;color:#eee;font-family:system-ui,-apple-system,sans-serif;touch-action:none}
+#game{position:relative;width:100%;height:100%;background:#050506}
+canvas{display:block;width:100%;height:100%}
+#hud{position:absolute;inset:0;pointer-events:none}
+#title{position:absolute;top:14px;left:16px;font-weight:900;letter-spacing:2px;font-size:14px;text-shadow:0 2px 8px #000}
+#objective{position:absolute;top:40px;left:16px;color:#aaa;font-size:12px}
+#fear{position:absolute;right:16px;top:16px;width:110px}
+#fear label{font-size:11px;color:#aaa}.bar{height:7px;background:#222;border-radius:9px;overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;width:12%;background:#b63a55}
+#msg{position:absolute;left:50%;top:16%;transform:translateX(-50%);font-size:18px;text-align:center;text-shadow:0 2px 12px #000;opacity:0;transition:opacity .3s;max-width:90%}
+#cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:20px;color:#bbb}
+#controls{position:absolute;inset:auto 0 18px 0;display:flex;justify-content:space-between;padding:0 18px;pointer-events:none}
+.pad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,52px);gap:5px;pointer-events:auto}
+.pad button,.actions button{width:52px;height:52px;border:1px solid #ffffff22;background:#15151bb8;color:#ddd;border-radius:14px;font-size:20px}
+.pad .up{grid-column:2}.pad .left{grid-column:1;grid-row:2}.pad .down{grid-column:2;grid-row:2}.pad .right{grid-column:3;grid-row:2}
+.actions{display:flex;gap:8px;pointer-events:auto;align-items:end}.actions button{width:70px;font-size:12px}
+#start{position:absolute;inset:0;background:radial-gradient(circle,#17171d,#030304 70%);display:flex;align-items:center;justify-content:center;text-align:center;z-index:5}
+.startbox{max-width:420px;padding:30px}.startbox h1{font-size:42px;letter-spacing:7px;margin:0 0 8px}.startbox p{color:#aaa;line-height:1.5}.startbox button{margin-top:15px;padding:14px 26px;border:1px solid #555;background:#17171b;color:#fff;border-radius:12px;font-weight:800}
+@media(min-width:800px){#controls{display:none}}
+</style>
+</head>
+<body>
+<div id="game">
+<canvas id="c"></canvas>
+<div id="hud">
+<div id="title">THE HOUSE · DEMO</div>
+<div id="objective">Найди 🔑 и открой дверь</div>
+<div id="fear"><label>СТРАХ</label><div class="bar"><i id="fearbar"></i></div></div>
+<div id="msg"></div><div id="cross">+</div>
+<div id="controls">
+<div class="pad"><button class="up" data-key="w">▲</button><button class="left" data-key="a">◀</button><button class="down" data-key="s">▼</button><button class="right" data-key="d">▶</button></div>
+<div class="actions"><button id="turnL">↶</button><button id="use">ВЗЯТЬ<br>ЗАПЕРЕТЬ</button><button id="turnR">↷</button></div>
+</div>
+</div>
+<div id="start"><div class="startbox"><h1>THE HOUSE</h1><p>3D horror demo.<br>Ты вошёл в дом, который должен был быть пустым.</p><button id="begin">ВОЙТИ В ДОМ</button></div></div>
+</div>
+<script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');let W,H;
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight}addEventListener('resize',resize);resize();
+const map=[
+"111111111111111",
+"100000000000001",
+"101111011111101",
+"100001010000001",
+"111101010111101",
+"100001000100001",
+"101111111101101",
+"100000000001001",
+"101111111101101",
+"100000010000001",
+"111111111111111"];
+let px=1.8,py=1.8,pa=0,keys={},hasKey=false,doorOpen=false,fear=10,started=false,monster={x:11.2,y:8.2,active:false};
+const FOV=Math.PI/3;
+function wall(x,y){return map[Math.floor(y)]?.[Math.floor(x)]!=="0"}
+function msg(t){const m=document.getElementById('msg');m.textContent=t;m.style.opacity=1;clearTimeout(msg.t);msg.t=setTimeout(()=>m.style.opacity=0,1800)}
+function dist(ax,ay,bx,by){return Math.hypot(ax-bx,ay-by)}
+function move(dx,dy){const nx=px+dx,ny=py+dy;if(!wall(nx,py))px=nx;if(!wall(px,ny))py=ny}
+function interact(){
+ if(dist(px,py,4.5,3.5)<.7&&!hasKey){hasKey=true;msg("🔑 Ты нашёл ключ.");return}
+ if(dist(px,py,12.5,9.5)<.9&&hasKey&&!doorOpen){doorOpen=true;msg("🚪 Дверь открыта... беги!");return}
+ if(doorOpen&&dist(px,py,13.3,9.5)<1){msg("🏃 ТЫ ВЫБРАЛСЯ. Но что-то вышло следом...");setTimeout(()=>location.reload(),2200);return}
+ msg("Здесь ничего нет.");
+}
+function cast(a){
+ let sin=Math.sin(a),cos=Math.cos(a),d=0;
+ while(d<20){d+=.025;let x=px+cos*d,y=py+sin*d;if(wall(x,y))return d}
+ return 20;
+}
+function render(){
+ ctx.fillStyle="#09090d";ctx.fillRect(0,0,W,H);
+ ctx.fillStyle="#15151d";ctx.fillRect(0,0,W,H/2);ctx.fillStyle="#0a0a0d";ctx.fillRect(0,H/2,W,H/2);
+ const rays=Math.min(W,900),step=W/rays;
+ for(let i=0;i<rays;i++){let a=pa-FOV/2+FOV*(i/rays),d=cast(a)*Math.cos(a-pa),h=Math.min(H*1.5,H/d*.72),shade=Math.max(15,115-d*6);ctx.fillStyle=`rgb(${shade},${shade},${shade+5})`;ctx.fillRect(i*step,(H-h)/2,step+1,h)}
+ // key
+ if(!hasKey){let kx=4.5,ky=3.5,d=dist(px,py,kx,ky),ang=Math.atan2(ky-py,kx-px)-pa;if(Math.abs(Math.atan2(Math.sin(ang),Math.cos(ang)))<FOV/2+.1&&d<8){let sx=W/2+Math.tan(ang)/(Math.tan(FOV/2))*W/2;let sz=Math.max(5,70/d);ctx.fillStyle="#e9d36b";ctx.beginPath();ctx.arc(sx,H/2,sz,0,Math.PI*2);ctx.fill()}}
+ // monster
+ if(monster.active){let d=dist(px,py,monster.x,monster.y),ang=Math.atan2(monster.y-py,monster.x-px)-pa;if(Math.abs(Math.atan2(Math.sin(ang),Math.cos(ang)))<FOV/2&&d<14){let sx=W/2+Math.tan(ang)/(Math.tan(FOV/2))*W/2,sz=Math.max(12,220/d);ctx.fillStyle="#b51f35";ctx.beginPath();ctx.arc(sx,H/2,sz,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.font=sz*.35+"px sans-serif";ctx.textAlign="center";ctx.fillText("•  •",sx,H/2-3)}}
+}
+function loop(){
+ if(started){
+  let speed=.045;if(keys.w)move(Math.cos(pa)*speed,Math.sin(pa)*speed);if(keys.s)move(-Math.cos(pa)*speed,-Math.sin(pa)*speed);if(keys.a)move(Math.cos(pa-Math.PI/2)*speed,Math.sin(pa-Math.PI/2)*speed);if(keys.d)move(Math.cos(pa+Math.PI/2)*speed,Math.sin(pa+Math.PI/2)*speed);
+  if(monster.active){let dx=px-monster.x,dy=py-monster.y,d=Math.hypot(dx,dy);monster.x+=dx/d*.012;monster.y+=dy/d*.012;if(d<3)fear=Math.min(100,fear+.18)}
+  if(hasKey&&!monster.active){monster.active=true;msg("👁️ Кажется, ты здесь не один.");}
+  fear=Math.max(0,fear-.01);document.getElementById('fearbar').style.width=fear+"%";render();
+ }
+ requestAnimationFrame(loop)
+}
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==="e")interact();if(e.key==="ArrowLeft")pa-=.08;if(e.key==="ArrowRight")pa+=.08});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+document.querySelectorAll('[data-key]').forEach(b=>{const k=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true});['pointerup','pointercancel','pointerleave'].forEach(x=>b.addEventListener(x,()=>keys[k]=false))});
+document.getElementById('turnL').addEventListener('pointerdown',()=>pa-=.12);document.getElementById('turnR').addEventListener('pointerdown',()=>pa+=.12);document.getElementById('use').addEventListener('pointerdown',interact);
+document.getElementById('begin').addEventListener('click',()=>{started=true;document.getElementById('start').style.display='none';msg("Найди ключ. Не шуми.");});
+loop();
+</script>
+</body>
+</html>
